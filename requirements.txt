@@ -1,0 +1,17 @@
+pandas
+chromadb
+sentence-transformers
+langgraph
+langchain
+langchain-groq
+pydantic
+python-dotenv
+fastapi
+uvicorn
+python-multipart
+vaderSentiment
+nltk
+torch
+transformers
+spacy
+networkx
