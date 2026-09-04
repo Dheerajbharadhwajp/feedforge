@@ -3,6 +3,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, LineChart, L
 import { Upload, CloudUpload, FileText, BarChart3, Zap, BrainCircuit, Star, AlertTriangle, CheckCircle, Search, Compass, Network, MessageSquare, ChevronLeft, TrendingUp, Smile, Heart, ThumbsDown, Info, Database, Brain, Copy, Check, Clock, X } from 'lucide-react';
 import ForceGraph2D from 'react-force-graph-2d';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const COLORS = ['#10b981', '#f59e0b', '#ef4444']; // Pos, Neu, Neg
 const EMOTION_COLORS = {
   joy:     '#10b981', // emerald
@@ -103,7 +105,7 @@ function App() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/api/upload-dataset', {
+      const response = await fetch(`${API_URL}/api/upload-dataset`, {
         method: 'POST',
         body: formData
       });
@@ -143,7 +145,7 @@ function App() {
   const fetchGraphData = async () => {
     setGraphLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/graph-data');
+      const res = await fetch(`${API_URL}/api/graph-data`);
       const data = await res.json();
       if (data.nodes && data.nodes.length > 0) {
          setGraphData(data);
@@ -157,7 +159,7 @@ function App() {
 
   const fetchEmotionAnalytics = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/emotion-analytics');
+      const res = await fetch(`${API_URL}/api/emotion-analytics`);
       const data = await res.json();
       if (data.trajectory) {
         setEmotionTrajectory(data.trajectory);
@@ -210,7 +212,7 @@ function App() {
     if (val.trim().length > 10) {
       typingTimeoutRef.current = setTimeout(async () => {
         try {
-          const res = await fetch('http://localhost:8000/api/autocomplete', {
+          const res = await fetch(`${API_URL}/api/autocomplete`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ text: val })
@@ -238,7 +240,7 @@ function App() {
     setPrediction('');
     setPortalResult(null);
     try {
-      const response = await fetch('http://localhost:8000/api/analyze-review', {
+      const response = await fetch(`${API_URL}/api/analyze-review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ review_text: review, rating: parseFloat(rating) })
@@ -274,7 +276,7 @@ function App() {
     setOwnerLoading(true);
     setOwnerError(null);
     try {
-      const response = await fetch('http://localhost:8000/api/owner-insights');
+      const response = await fetch(`${API_URL}/api/owner-insights`);
       const data = await response.json();
       if (data.error) {
         setOwnerError(data.error);
@@ -311,7 +313,7 @@ function App() {
     setIsChatLoading(true);
 
     try {
-      const resp = await fetch('http://localhost:8000/api/owner-chat', {
+      const resp = await fetch(`${API_URL}/api/owner-chat`, {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({
@@ -336,7 +338,7 @@ function App() {
   const fetchSuggestedQuestions = async () => {
     setSuggestedLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/suggested-questions');
+      const res = await fetch(`${API_URL}/api/suggested-questions`);
       const data = await res.json();
       setSuggestedQuestions(data.questions || []);
     } catch (err) {
