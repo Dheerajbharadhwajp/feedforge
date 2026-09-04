@@ -1,11 +1,87 @@
 import pandas as pd
 import chromadb
-from chromadb.utils import embedding_functions
+from chromadb.utils.embedding_functions import EmbeddingFunction
 import datetime
 import re
 import os
+import time
+import requests
 from config import CSV_PATH, CHROMA_DB_PATH, COLLECTION_NAME
 from nlp import analyze_sentiment, analyze_emotions
+
+GEMINI_EMBED_MODEL = "models/gemini-embedding-001"
+GEMINI_EMBED_DIM = 768
+GEMINI_EMBED_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/{GEMINI_EMBED_MODEL}:batchEmbedContents"
+)
+GEMINI_BATCH_LIMIT = 100  # max texts per batchEmbedContents call
+
+class GeminiEmbeddingFunction(EmbeddingFunction):
+    """
+    Calls Google's Gemini embeddings API instead of running a local model.
+    Keeps the process's own memory footprint tiny, which matters on
+    memory-constrained hosts (e.g. Render's 512Mi starter instance) where
+    a local sentence-transformers/ONNX model easily exceeds the limit.
+    """
+
+    def __init__(self):
+        self.api_key = os.getenv("GOOGLE_API_KEY")
+        if not self.api_key:
+            raise RuntimeError("GOOGLE_API_KEY is not set; required for embeddings.")
+
+    def __call__(self, input):
+        texts = list(input)
+        all_embeddings = []
+        for i in range(0, len(texts), GEMINI_BATCH_LIMIT):
+            chunk = texts[i:i + GEMINI_BATCH_LIMIT]
+            all_embeddings.extend(self._embed_chunk(chunk))
+        return all_embeddings
+
+    def _embed_chunk(self, chunk, max_retries=5):
+        body = {
+            "requests": [
+                {
+                    "model": GEMINI_EMBED_MODEL,
+                    "content": {"parts": [{"text": text[:2000]}]},
+                    "outputDimensionality": GEMINI_EMBED_DIM,
+                }
+                for text in chunk
+            ]
+        }
+        for attempt in range(max_retries):
+            resp = requests.post(
+                GEMINI_EMBED_URL,
+                params={"key": self.api_key},
+                json=body,
+                timeout=30,
+            )
+            if resp.status_code == 429 and attempt < max_retries - 1:
+                # Free tier is capped at 100 embed requests/minute; honor the
+                # server's suggested retryDelay instead of a short fixed backoff.
+                retry_delay = 60
+                try:
+                    for detail in resp.json().get("error", {}).get("details", []):
+                        if "retryDelay" in detail:
+                            retry_delay = int(float(detail["retryDelay"].rstrip("s"))) + 1
+                except (ValueError, KeyError):
+                    pass
+                time.sleep(retry_delay)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            return [item["values"] for item in data["embeddings"]]
+        raise RuntimeError("Gemini embeddings API: exceeded retries")
+
+    @staticmethod
+    def name():
+        return "gemini_text_embedding_004"
+
+    def get_config(self):
+        return {}
+
+    @staticmethod
+    def build_from_config(config):
+        return GeminiEmbeddingFunction()
 
 def parse_date_to_year_month(date_str: str):
     """Helper to extract year and month from diverse date formats."""
@@ -44,9 +120,7 @@ def parse_date_to_year_month(date_str: str):
 class MemoryBank:
     def __init__(self):
         self.client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-        self.ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        self.ef = GeminiEmbeddingFunction()
         self.collection = self.client.get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=self.ef,

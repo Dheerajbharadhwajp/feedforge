@@ -1,6 +1,6 @@
 pandas
 chromadb
-sentence-transformers
+requests
 langgraph
 langchain
 langchain-groq

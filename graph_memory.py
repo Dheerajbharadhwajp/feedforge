@@ -1,15 +1,22 @@
-import spacy
 import networkx as nx
 import json
 
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    print("Warning: en_core_web_sm not found. Run 'python -m spacy download en_core_web_sm'.")
-    # Graceful degradation if model isn't downloaded yet.
-    nlp = None
-
 kg = nx.Graph()
+_nlp = None
+_nlp_loaded = False
+
+def _get_nlp():
+    """Loads the spacy model lazily on first use, not at import time."""
+    global _nlp, _nlp_loaded
+    if not _nlp_loaded:
+        import spacy
+        try:
+            _nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            print("Warning: en_core_web_sm not found. Run 'python -m spacy download en_core_web_sm'.")
+            _nlp = None
+        _nlp_loaded = True
+    return _nlp
 
 def extract_graph_from_df(df):
     """
@@ -18,7 +25,8 @@ def extract_graph_from_df(df):
     """
     global kg
     kg.clear()
-    
+
+    nlp = _get_nlp()
     if nlp is None:
         return {"nodes": [], "links": []}
     

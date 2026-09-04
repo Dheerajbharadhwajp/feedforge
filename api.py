@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
+import asyncio
 import uuid
 import pandas as pd
 import io
@@ -31,7 +32,9 @@ from graph_memory import extract_graph_from_df, get_graph_data
 
 @app.on_event("startup")
 async def startup_event():
-    memory_bank.load_data()
+    # Runs in a background thread so the server starts accepting requests
+    # immediately instead of blocking on the (rate-limited) embedding pass.
+    asyncio.create_task(asyncio.to_thread(memory_bank.load_data))
     # Graph is built on-demand during CSV upload, not on startup
 
 class ReviewRequest(BaseModel):
